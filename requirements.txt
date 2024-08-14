@@ -5,12 +5,14 @@ openpyxl==3.0.7
 yfinance==0.1.55
 QuantLib==1.35
 google-cloud-storage==1.42.3
-numpy==1.21.0
+numpy>=1.21.0
 python-dateutil
 gunicorn==20.1.0
 requests==2.25.1
 nest-asyncio==1.5.1
 plotly==5.22.0
+setuptools>=51.0.0
+
 
 
 
