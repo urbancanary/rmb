@@ -5,6 +5,4 @@ openpyxl==3.0.7
 yfinance==0.1.55
 QuantLib-Python==1.18
 google-cloud-storage==1.42.3
-numpy==1.21.0
 python-dateutil
-setuptools>=51.0.0
