@@ -7,4 +7,6 @@ QuantLib-Python==1.18
 google-cloud-storage==1.42.3
 python-dateutil
 setuptools>=51.0.0
+wheel
+
 
