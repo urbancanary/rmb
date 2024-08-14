@@ -59,33 +59,33 @@ selected_country = st.selectbox('Select a Country:', ['Israel', 'Mexico', 'Qatar
 # Define the URL for the process_json endpoint
 url = "https://my-combined-app-vpljqiia2a-uc.a.run.app/process_json"
 
-# Function to fetch data with pagination
+# Function to fetch data with pagination and error handling
 def fetch_data(payload, page=1):
     payload["sample_key"] = payload["sample_key"].replace('"page": 1', f'"page": {page}')
-    response = requests.post(url, json=payload)
-    if response.status_code == 200:
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()  # Raise an exception for bad status codes
         return response.json()
-    else:
-        st.error(f"Failed to retrieve data from the process_json endpoint for page {page}")
-        return []
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching data for page {page}: {e}")
+        st.stop()  # Stop execution if data fetching fails
 
 # Update the payload dynamically based on selected country
 payload = {
     "sample_key": f'{{"db_path": "credit_research.db", "table": "FullReport", "filters": {{"Country": "{selected_country}"}}, "fields": "*", "page": 1, "page_size": 10}}'
 }
 
-# Fetch data for pages 1 and 2
+# Fetch data for pages 1 and 2 with error handling
 all_data = []
-for page in range(1, 3):  # Fetching page 1 and 2
+for page in range(1, 3):
     data_chunk = fetch_data(payload, page)
-    if data_chunk:
-        all_data.extend(data_chunk)
+    all_data.extend(data_chunk)
 
-# If data is available, use the first chunk for display
-if all_data:
+# Check if the first page has data before assigning 'report'
+if all_data and len(all_data[0]) > 0:
     report = all_data[0]
 else:
-    st.error("No data available to display")
+    st.error("No data available for the selected country.")
     st.stop()
 
 # Layout: Two columns, left for the report, right for the charts
@@ -138,24 +138,32 @@ with col1:
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Generate the charts and data tables in the right-hand column
+# Generate charts and data tables in the right-hand column
 with col2:
     st.markdown('<div class="chartColumn">', unsafe_allow_html=True)
     st.header("Economic Data (2024 Onwards)")
 
-    # Define the custom color palette
-    color_palette = ["#FFA500", "#007FFF", "#DC143C", "#32CD32", "#FFD700", "#4B0082"]
+    # Updated custom color palette for dark grey background
+    color_palette = [
+        "#FFA500",  # Bright Orange
+        "#007FFF",  # Azure Blue
+        "#DC143C",  # Cherry Red
+        "#39FF14",  # Electric Lime Green
+        "#00FFFF",  # Cyan
+        "#DA70D6"   # Vivid Purple
+    ]
 
-    def plot_chart(df, y_column, title):
+    def plot_chart(df, y_column, title, color):
         fig = px.bar(df, x='Year', y=y_column,
                      title=title,
-                     color_discrete_sequence=color_palette,
-                     height=300)
+                     color_discrete_sequence=[color],
+                     height=375) 
         fig.update_traces(marker_line_width=0)
         fig.update_layout(
             plot_bgcolor='#2f2f2f',
             paper_bgcolor='#2f2f2f',
             font=dict(color='white'),
+            margin=dict(l=20, r=20, t=60, b=40),
             autosize=True
         )
         return fig
@@ -165,34 +173,38 @@ with col2:
         table_html += "<tr><th>Year</th>" + "".join([f"<th>{year}</th>" for year in df['Year']]) + "</tr>"
         table_html += f"<tr><td>{y_column}</td>"
         for value in df[y_column]:
-            table_html += f"<td>{value:.2f}</td>"
+            if value is not None:
+                table_html += f"<td>{value:.2f}</td>"  # Format as a float with 2 decimal places
+            else:
+                table_html += "<td>N/A</td>"  # Use "N/A" for None values
         table_html += "</tr></table>"
         return table_html
 
     # Create all dataframes
     charts_data = [
-        ("GDP Growth (%)", [report.get(f'GDPGrowthRateYear{i}', 0) for i in range(1, 7)]),
-        ("Inflation Rate (%)", [report.get(f'InflationYear{i}', 0) for i in range(1, 7)]),
-        ("Unemployment Rate (%)", [report.get(f'UnemploymentRateYear{i}', 0) for i in range(1, 7)]),
-        ("Population (millions)", [report.get(f'PopulationYear{i}', 0) for i in range(1, 7)]),
-        ("Government Budget Balance (% of GDP)", [report.get(f'GovernmentFinancesYear{i}', 0) for i in range(1, 7)]),
-        ("Current Account Balance (% of GDP)", [report.get(f'CurrentAccountBalanceYear{i}', 0) for i in range(1, 7)])
+        ("GDP Growth (%)", [report.get(f'GDPGrowthRateYear{i}', 0) for i in range(1, 7)], color_palette[0]),
+        ("Inflation Rate (%)", [report.get(f'InflationYear{i}', 0) for i in range(1, 7)], color_palette[1]),
+        ("Unemployment Rate (%)", [report.get(f'UnemploymentRateYear{i}', 0) for i in range(1, 7)], color_palette[2]),
+        ("Population (millions)", [report.get(f'PopulationYear{i}', 0) for i in range(1, 7)], color_palette[3]),
+        ("Government Budget Balance (% of GDP)", [report.get(f'GovernmentFinancesYear{i}', 0) for i in range(1, 7)], color_palette[4]),
+        ("Current Account Balance (% of GDP)", [report.get(f'CurrentAccountBalanceYear{i}', 0) for i in range(1, 7)], color_palette[5])
     ]
 
     years = [2024, 2025, 2026, 2027, 2028, 2029]
 
-    for metric, values in charts_data:
+    for metric, values, color in charts_data:
         df = pd.DataFrame({
             "Year": years,
             metric: values
         })
 
-        # Display the chart
-        st.plotly_chart(plot_chart(df, metric, metric), use_container_width=True)
+        # Display the chart with the specified color
+        st.plotly_chart(plot_chart(df, metric, metric, color), use_container_width=True)
 
         # Display the data table
         st.markdown(create_data_table(df, metric), unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
+
 
 
